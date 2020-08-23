@@ -8,6 +8,7 @@ namespace CompanyRelations
     {
         static void Main(string[] args)
         {
+            // Initial company list
             var companies = new List<Company>()
             {
                 new Company(){Name = "A"},
@@ -18,80 +19,124 @@ namespace CompanyRelations
                 new Company(){Name = "F"}
             };
 
-            // Parent - Daughter
-            var companyRelations = new Dictionary<string, string>()
+            // Parent - Daughter Mappings
+            var companyRelations = new List<KeyValuePair<string, string>>()
             {
-                {"A", "B" },
-                {"C", "D" },
-                {"E", "F" },
+                new KeyValuePair<string, string>("A", "B" ),
+                //new KeyValuePair<string, string>("B", "C" ),
+                new KeyValuePair<string, string>("C", "D" ),
+                new KeyValuePair<string, string>("E", "F" ),
             };
 
             // Assign each company it's parent from the list of companies
-            // Important that it is the same object
-            foreach (var company in companyRelations)
-            {
-                companies.FirstOrDefault(c => c.Name.Equals(company.Value)).Parent = companies.FirstOrDefault(c => c.Name.Equals(company.Key));
-            }
-
+            MapCompanies(companies, companyRelations);
+            
+            // Company list to check if related
             // Parent - Daughter
-            var companiesToCheck = new Dictionary<string, string>()
+            var companiesToCheck = new List<KeyValuePair<string, string>>()
             {
-                {"A", "B" },
-                {"B", "C" },
-                {"C", "D" },
-                {"D", "E" },
-                {"E", "F" }
+                new KeyValuePair<string,string>("A", "B" ),
+                new KeyValuePair<string,string>("A", "C" ),
+                new KeyValuePair<string,string>("B", "C" ),
+                new KeyValuePair<string,string>("C", "D" ),
+                new KeyValuePair<string,string>("E", "F" )
             };
 
-            Console.WriteLine("Attempting Iterative algorithm: ");
-            CheckForMatchesByIterating(companies, companiesToCheck);
-
-            Console.WriteLine("Attempting Recursive algorithm: ");
-            CheckForMatchesByRecursion(companies, companiesToCheck);
+            CheckForMatches(companies, companiesToCheck);
         }
 
-        private static void CheckForMatchesByIterating(List<Company> companies, Dictionary<string, string> companiesToCheck)
+        private static void MapCompanies(List<Company> companies, List<KeyValuePair<string, string>> companyRelations)
         {
-            string parent;
-            string daughter;
+            Company daughterCompany;
+            Company parentCompany;
+            foreach (var company in companyRelations)
+            {
+                daughterCompany = companies.FirstOrDefault(c => c.Name.Equals(company.Value));
+                parentCompany = companies.FirstOrDefault(c => c.Name.Equals(company.Key));
+
+                // Both companies Exist
+                if (daughterCompany == null || parentCompany == null)
+                {
+                    return;
+                }
+
+                daughterCompany.Parent = parentCompany;
+            }
+        }
+
+        private static void CheckForMatches(List<Company> companies, List<KeyValuePair<string, string>> companiesToCheck)
+        {
+            string parentCompanyName;
+            string daughterCompanyName;
             foreach (var company in companiesToCheck)
             {
-                parent = company.Key;
-                daughter = company.Value;
+                parentCompanyName = company.Key;
+                daughterCompanyName = company.Value;
 
-                if (companies.Any(c => c.Name == daughter && (c.Parent != null && c.Parent.Name == parent)))
+                var startCompany = companies.FirstOrDefault(c => c.Name.Equals(daughterCompanyName));
+
+                if (startCompany == null)
                 {
-                    Console.WriteLine($"{parent} - {daughter} - Yes.");
+                    Console.WriteLine($"Company: {daughterCompanyName} Not Found!");
+                    continue;
+                }
+
+                // Iterative Algorithm Check
+                bool companyIsRelated = IterativeMatches(startCompany, parentCompanyName);
+
+                if (companyIsRelated)
+                {
+                    Console.WriteLine($"Iterative: {parentCompanyName} - {daughterCompanyName} - Yes.");
                 }
                 else
                 {
-                    Console.WriteLine($"{parent} - {daughter} - No.");
+                    Console.WriteLine($"Iterative: {parentCompanyName} - {daughterCompanyName} - No.");
                 }
+
+                // Recursive Algorithm Check
+                companyIsRelated = RecursiveMatches(startCompany, parentCompanyName);
+
+                if (companyIsRelated)
+                {
+                    Console.WriteLine($"Recursive: {parentCompanyName} - {daughterCompanyName} - Yes.");
+                }
+                else
+                {
+                    Console.WriteLine($"Recursive: {parentCompanyName} - {daughterCompanyName} - No.");
+                }
+
+                Console.WriteLine();
             }
         }
 
-        private static void CheckForMatchesByRecursion(List<Company> companies, Dictionary<string, string> companiesToCheck, int index = 0)
+        private static bool IterativeMatches(Company company, string parentCompanyName)
         {
-            if(index == companiesToCheck.Count)
+            while(company.Parent != null)
             {
-                return;
+                if (company.Parent.Name.Equals(parentCompanyName))
+                {
+                    return true;
+                }
+
+                company = company.Parent;
             }
 
-            var companyKVP = companiesToCheck.Skip(index).Take(1).FirstOrDefault();
+            return false;
+        }
 
-            string parent = companyKVP.Key;
-            string daughter = companyKVP.Value;
-
-            if (companies.Any(c => c.Name == daughter && (c.Parent != null && c.Parent.Name == parent)))
+        private static bool RecursiveMatches(Company company, string parentCompanyName)
+        {
+            if(company == null || company.Parent == null)
             {
-                Console.WriteLine($"{parent} - {daughter} - Yes.");
-            }
-            else
-            {
-                Console.WriteLine($"{parent} - {daughter} - No.");
+                return false;
             }
 
-            CheckForMatchesByRecursion(companies, companiesToCheck, ++index);
+            if (company.Parent.Name.Equals(parentCompanyName))
+            {
+                return true;
+            }
+
+            return RecursiveMatches(company.Parent, parentCompanyName);
         }
     }
 }
