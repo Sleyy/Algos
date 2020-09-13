@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace CompanyRelations
@@ -17,42 +18,50 @@ namespace CompanyRelations
                 new Company(){Name = "D"},
                 new Company(){Name = "E"},
                 new Company(){Name = "F"}
-            };
+            }.AsEnumerable();
 
-            // Parent - Daughter Mappings
+            // Daughter - Parent Mappings
             var companyRelations = new List<KeyValuePair<string, string>>()
             {
                 new KeyValuePair<string, string>("A", "B" ),
-                //new KeyValuePair<string, string>("B", "C" ),
+                new KeyValuePair<string, string>("B", "C" ),
                 new KeyValuePair<string, string>("C", "D" ),
+                //new KeyValuePair<string, string>("C", "E" ),
                 new KeyValuePair<string, string>("E", "F" ),
-            };
+            }.AsEnumerable();
 
             // Assign each company it's parent from the list of companies
             MapCompanies(companies, companyRelations);
-            
+
             // Company list to check if related
-            // Parent - Daughter
+            // Company - relatedCompany
             var companiesToCheck = new List<KeyValuePair<string, string>>()
             {
+                // Direct Cases
                 new KeyValuePair<string,string>("A", "B" ),
-                new KeyValuePair<string,string>("A", "C" ),
                 new KeyValuePair<string,string>("B", "C" ),
                 new KeyValuePair<string,string>("C", "D" ),
-                new KeyValuePair<string,string>("E", "F" )
-            };
+                new KeyValuePair<string,string>("E", "F" ),
+                // Indirect Cases
+                new KeyValuePair<string,string>("A", "E" ),
+                new KeyValuePair<string,string>("A", "F" ),
+                new KeyValuePair<string,string>("F", "A" ),
+                // Backwards relations
+                new KeyValuePair<string,string>("D", "A" ),
+
+            }.AsEnumerable();
 
             CheckForMatches(companies, companiesToCheck);
         }
 
-        private static void MapCompanies(List<Company> companies, List<KeyValuePair<string, string>> companyRelations)
+        private static void MapCompanies(IEnumerable<Company> companies, IEnumerable<KeyValuePair<string, string>> companyRelations)
         {
             Company daughterCompany;
             Company parentCompany;
             foreach (var company in companyRelations)
             {
-                daughterCompany = companies.FirstOrDefault(c => c.Name.Equals(company.Value));
-                parentCompany = companies.FirstOrDefault(c => c.Name.Equals(company.Key));
+                daughterCompany = companies.FirstOrDefault(c => c.Name.Equals(company.Key));
+                parentCompany = companies.FirstOrDefault(c => c.Name.Equals(company.Value));
 
                 // Both companies Exist
                 if (daughterCompany == null || parentCompany == null)
@@ -60,83 +69,122 @@ namespace CompanyRelations
                     return;
                 }
 
-                daughterCompany.Parent = parentCompany;
+                daughterCompany.Parents.Add(parentCompany);
             }
         }
 
-        private static void CheckForMatches(List<Company> companies, List<KeyValuePair<string, string>> companiesToCheck)
+        private static void CheckForMatches(IEnumerable<Company> companies, IEnumerable<KeyValuePair<string, string>> companiesToCheck)
         {
-            string parentCompanyName;
             string daughterCompanyName;
+            string relatedCompanyName;
+
+            bool companiesAreRelatedIteratively = false;
+           
+
             foreach (var company in companiesToCheck)
             {
-                parentCompanyName = company.Key;
-                daughterCompanyName = company.Value;
+                daughterCompanyName = company.Key;
+                relatedCompanyName = company.Value;
 
                 var startCompany = companies.FirstOrDefault(c => c.Name.Equals(daughterCompanyName));
+                var relatedCompany = companies.FirstOrDefault(c => c.Name.Equals(relatedCompanyName));
 
-                if (startCompany == null)
+                if (startCompany == null || relatedCompany == null)
                 {
-                    Console.WriteLine($"Company: {daughterCompanyName} Not Found!");
+                    Console.WriteLine($"Companies Not Found!");
                     continue;
                 }
 
-                // Iterative Algorithm Check
-                bool companyIsRelated = IterativeMatches(startCompany, parentCompanyName);
 
-                if (companyIsRelated)
+                Console.WriteLine($"Checking {daughterCompanyName} - {relatedCompanyName} for relations.");
+
+                // Iterative Algorithm Check
+
+                companiesAreRelatedIteratively = IterativeMatches(startCompany, relatedCompany);
+                // Double check for backwards relations
+                if (!companiesAreRelatedIteratively)
                 {
-                    Console.WriteLine($"Iterative: {parentCompanyName} - {daughterCompanyName} - Yes.");
+                    companiesAreRelatedIteratively = IterativeMatches(relatedCompany, startCompany);
                 }
-                else
-                {
-                    Console.WriteLine($"Iterative: {parentCompanyName} - {daughterCompanyName} - No.");
-                }
+                Console.WriteLine($"Iterative {(companiesAreRelatedIteratively ? "Yes" : "No")}");
+
 
                 // Recursive Algorithm Check
-                companyIsRelated = RecursiveMatches(startCompany, parentCompanyName);
-
-                if (companyIsRelated)
+                bool companiesAreRelatedRecursively = false;
+                RecursiveMatches(startCompany, relatedCompany, ref companiesAreRelatedRecursively);
+                // Reset checked flag
+                companies.Select(c => { c.Checked = false; return c; }).ToList();
+                // Double check for backwards relations
+                if (!companiesAreRelatedRecursively)
                 {
-                    Console.WriteLine($"Recursive: {parentCompanyName} - {daughterCompanyName} - Yes.");
+                    RecursiveMatches(relatedCompany, startCompany, ref companiesAreRelatedRecursively);
+                    companies.Select(c => { c.Checked = false; return c; }).ToList();
                 }
-                else
-                {
-                    Console.WriteLine($"Recursive: {parentCompanyName} - {daughterCompanyName} - No.");
-                }
+                Console.WriteLine($"Recursive {(companiesAreRelatedRecursively ? "Yes" : "No")}");
 
                 Console.WriteLine();
             }
         }
 
-        private static bool IterativeMatches(Company company, string parentCompanyName)
+        private static bool IterativeMatches(Company startCompany, Company relatedCompany)
         {
-            while(company.Parent != null)
+            // Using HashSet to avoid endless cycles of iterations
+            var parentCompanies = new HashSet<Company>();
+
+            parentCompanies.UnionWith(startCompany.Parents);
+
+            int parentCompaniesCount;
+            var currentParentCompany = new Company();
+            var alreadyCheckedParents = new Collection<Company>();
+
+            while (parentCompanies.Count > 0)
             {
-                if (company.Parent.Name.Equals(parentCompanyName))
+                // Check for direct relation
+                if (parentCompanies.Contains(relatedCompany))
                 {
                     return true;
                 }
 
-                company = company.Parent;
+                // Replace parents by their parents
+                parentCompaniesCount = parentCompanies.Count;
+                for (int i = 0; i < parentCompaniesCount; i++)
+                {
+                    currentParentCompany = parentCompanies.ElementAt(i);
+
+                    if (currentParentCompany.Parents.Count > 0)
+                    {
+                        parentCompanies.UnionWith(currentParentCompany.Parents);
+                    }
+
+                    // Store the already checked parents
+                    alreadyCheckedParents.Add(currentParentCompany);
+                }
+
+                // Remove the already checked parents
+                parentCompanies.RemoveWhere(pc => alreadyCheckedParents.Contains(pc));
+                alreadyCheckedParents.Clear();
             }
 
             return false;
         }
 
-        private static bool RecursiveMatches(Company company, string parentCompanyName)
+        private static void RecursiveMatches(Company startCompany, Company relatedCompany, ref bool companiesAreRelated)
         {
-            if(company == null || company.Parent == null)
+            // Check for Direct Relation
+            if (startCompany.Parents.Contains(relatedCompany))
             {
-                return false;
+                companiesAreRelated = true;
+                // End recursion on result found
+                return;
             }
 
-            if (company.Parent.Name.Equals(parentCompanyName))
-            {
-                return true;
-            }
+            startCompany.Checked = true;
 
-            return RecursiveMatches(company.Parent, parentCompanyName);
+            // Check each parent if their parent has matches
+            foreach (var pc in startCompany.Parents.Where(p => !p.Checked))
+            {
+                RecursiveMatches(pc, relatedCompany, ref companiesAreRelated);
+            }
         }
     }
 }
