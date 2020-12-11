@@ -186,5 +186,23 @@ namespace CompanyRelations
                 RecursiveMatches(pc, relatedCompany, ref companiesAreRelated);
             }
         }
+
+        //private static bool RecursiveMatches(Company startCompany, Company relatedCompany)
+        //{
+        //    // Check for Direct Relation
+        //    if (startCompany.Parents.Contains(relatedCompany))
+        //        return true;
+
+        //    startCompany.Checked = true;
+
+        //    // Check each parent if their parent has matches
+        //    foreach (var pc in startCompany.Parents.Where(p => !p.Checked))
+        //    {
+        //        if (RecursiveMatches(pc, relatedCompany))
+        //            return true;
+        //    }
+
+        //    return false;
+        //}
     }
 }
